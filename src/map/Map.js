@@ -122,10 +122,6 @@ export const Map = Evented.extend({
 		// Whether the map automatically handles browser window resize to update itself.
 		trackResize: true,
 
-		// @option bearing: Number = 0
-		// Control the rotation in the x,y plan. The value is in deg
-		bearing: 0,
-
 		// @option rotate: Boolean = false
 		// Whether the map should apply rotation
 		rotate: false
@@ -143,10 +139,7 @@ export const Map = Evented.extend({
 
 		if (options.rotate) {
 			this._rotate = true;
-
-			if (options.bearing) {
-				this._bearing = options.bearing; // TODO: mod 360
-			}
+			this._bearing = 0;
 		}
 
 		this._initContainer(id);
@@ -1136,7 +1129,7 @@ export const Map = Evented.extend({
 	// @method getBearing(): Number
 	// Will return the rotation value in deg.
 	getBearing() {
-		return (this._bearing || 0) * DomUtil.RAD_TO_DEG;
+		return this._bearing * DomUtil.RAD_TO_DEG;
 	},
 
 
@@ -1202,7 +1195,6 @@ export const Map = Evented.extend({
 		DomUtil.setPosition(this._mapPane, new Point(0, 0));
 
 		if (this._rotate) {
-			this._pivot = this.getSize().divideBy(2);
 			this._rotatePane = this.createPane('rotatePane', this._mapPane);
 			DomUtil.setPosition(this._rotatePane, new Point(0, 0), this._bearing, this._pivot);
 		}
