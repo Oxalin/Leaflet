@@ -121,6 +121,7 @@ export const Marker = Layer.extend({
 
 		this._initIcon();
 		this.update();
+		map.on('rotate', this.update, this);
 	},
 
 	onRemove(map) {
@@ -310,7 +311,11 @@ export const Marker = Layer.extend({
 
 	_setPos(pos) {
 
-		if (this._icon) {
+		// Rotate the icon according
+		if (this._map._rotate && this._icon) {
+			const anchor = this.options.icon.options.iconAnchor || point(0, 0);
+			DomUtil.setPosition(this._icon, pos, -this._map._bearing || 0, pos.add(anchor));
+		} else {
 			DomUtil.setPosition(this._icon, pos);
 		}
 
