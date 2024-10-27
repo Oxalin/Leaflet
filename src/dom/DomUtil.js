@@ -53,10 +53,13 @@ export function toBack(el) {
 // Resets the 3D CSS transform of `el` so it is translated by `offset` pixels
 // and optionally scaled by `scale`. Does not have an effect if the
 // browser doesn't support 3D CSS transforms.
-export function setTransform(el, offset, scale) {
-	const pos = offset || new Point(0, 0);
+export function setTransform(el, offset, scale, bearing, pivot) {
+	let pos = offset || new Point(0, 0);
 
-	el.style.transform = `translate3d(${pos.x}px,${pos.y}px,0)${scale ? ` scale(${scale})` : ''}`;
+	if (bearing) {
+		pos = pos.rotateFrom(bearing, pivot);
+	}
+	el.style.transform = `translate3d(${pos.x}px,${pos.y}px,0)${scale ? ` scale(${scale})` : ''}${bearing ? ` rotate(${bearing}rad)` : ''}`;
 }
 
 const positions = new WeakMap();
@@ -65,9 +68,9 @@ const positions = new WeakMap();
 // Sets the position of `el` to coordinates specified by `position`,
 // using CSS translate or top/left positioning depending on the browser
 // (used by Leaflet internally to position its layers).
-export function setPosition(el, point) {
-	positions.set(el, point);
-	setTransform(el, point);
+export function setPosition(el, point, bearing, pivot) {
+	positions.set(el, point, undefined, bearing, pivot);
+	setTransform(el, point, undefined, bearing, pivot);
 }
 
 // @function getPosition(el: HTMLElement): Point
@@ -75,8 +78,13 @@ export function setPosition(el, point) {
 export function getPosition(el) {
 	// this method is only used for elements previously positioned using setPosition,
 	// so it's safe to cache the position for performance
+
 	return positions.get(el) ?? new Point(0, 0);
 }
+
+// Constants for rotation
+export const DEG_TO_RAD = Math.PI / 180;
+export const RAD_TO_DEG = 180 / Math.PI;
 
 const documentStyle = typeof document === 'undefined' ? {} : document.documentElement.style;
 // Safari still needs a vendor prefix, we need to detect with property name is supported.

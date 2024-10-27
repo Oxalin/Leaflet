@@ -120,7 +120,15 @@ export const Map = Evented.extend({
 
 		// @option trackResize: Boolean = true
 		// Whether the map automatically handles browser window resize to update itself.
-		trackResize: true
+		trackResize: true,
+
+		// @option bearing: Number = 0
+		// Control the rotation in the x,y plan. The value is in deg
+		bearing: 0,
+
+		// @option rotate: Boolean = false
+		// Whether the map should apply rotation
+		rotate: false
 	},
 
 	initialize(id, options) { // (HTMLElement or String, Object)
@@ -132,6 +140,14 @@ export const Map = Evented.extend({
 		this._layers = {};
 		this._zoomBoundLayers = {};
 		this._sizeChanged = true;
+
+		if (options.rotate) {
+			this._rotate = true;
+
+			if (options.bearing) {
+				this._bearing = options.bearing; // TODO: mod 360
+			}
+		}
 
 		this._initContainer(id);
 		this._initLayout();
@@ -806,7 +822,7 @@ export const Map = Evented.extend({
 	// as a child of the main map pane if not set.
 	createPane(name, container) {
 		const className = `leaflet-pane${name ? ` leaflet-${name.replace('Pane', '')}-pane` : ''}`,
-		    pane = DomUtil.create('div', className, container || this._mapPane);
+		    pane = DomUtil.create('div', className, container || (this._rotate ? this._rotatePane : this._mapPane));
 
 		if (name) {
 			this._panes[name] = pane;
@@ -1036,14 +1052,28 @@ export const Map = Evented.extend({
 	// Given a pixel coordinate relative to the map container, returns the corresponding
 	// pixel coordinate relative to the [origin pixel](#map-getpixelorigin).
 	containerPointToLayerPoint(point) { // (Point)
+		if (this._rotate && this._bearing) {
+			return toPoint(point)
+				.subtract(this._getMapPanePos())
+				.rotateFrom(-this._bearing, this._getRotatePanePos())
+				.subtract(this._getRotatePanePos());
+		}
 		return toPoint(point).subtract(this._getMapPanePos());
+
 	},
 
 	// @method layerPointToContainerPoint(point: Point): Point
 	// Given a pixel coordinate relative to the [origin pixel](#map-getpixelorigin),
 	// returns the corresponding pixel coordinate relative to the map container.
 	layerPointToContainerPoint(point) { // (Point)
+		if (this._rotate && this._bearing) {
+			return toPoint(point)
+				.add(this._getRotatePanePos())
+				.rotateFrom(this._bearing, this._getRotatePanePos())
+				.add(this._getMapPanePos());
+		}
 		return toPoint(point).add(this._getMapPanePos());
+
 	},
 
 	// @method containerPointToLatLng(point: Point): LatLng
@@ -1080,6 +1110,33 @@ export const Map = Evented.extend({
 	// event took place.
 	mouseEventToLatLng(e) { // (MouseEvent)
 		return this.layerPointToLatLng(this.mouseEventToLayerPoint(e));
+	},
+
+	// Rotation methods
+	// @method setBearing(theta: Number)
+	// theta is in deg.
+	// setBearing will work with just the 'theta' parameter.
+	setBearing(theta) {
+		if (!Browser.any3d || !this._rotate) { return; }
+
+		let rotatePanePos = this._getRotatePanePos();
+		const halfSize = this.getSize().divideBy(2);
+		this._pivot = this._getMapPanePos().clone().multiplyBy(-1).add(halfSize);
+
+		rotatePanePos = rotatePanePos.rotateFrom(-this._bearing, this._pivot);
+
+		this._bearing = theta * DomUtil.DEG_TO_RAD; // TODO: mod 360
+		this._rotatePanePos = rotatePanePos.rotateFrom(this._bearing, this._pivot);
+
+		DomUtil.setPosition(this._rotatePane, this._rotatePanePos, this._bearing, this._rotatePanePos);
+
+		this.fire('rotate');
+	},
+
+	// @method getBearing(): Number
+	// Will return the rotation value in deg.
+	getBearing() {
+		return (this._bearing || 0) * DomUtil.RAD_TO_DEG;
 	},
 
 
@@ -1143,6 +1200,12 @@ export const Map = Evented.extend({
 
 		this._mapPane = this.createPane('mapPane', this._container);
 		DomUtil.setPosition(this._mapPane, new Point(0, 0));
+
+		if (this._rotate) {
+			this._pivot = this.getSize().divideBy(2);
+			this._rotatePane = this.createPane('rotatePane', this._mapPane);
+			DomUtil.setPosition(this._rotatePane, new Point(0, 0), this._bearing, this._pivot);
+		}
 
 		// @pane tilePane: HTMLElement = 200
 		// Pane for `GridLayer`s and `TileLayer`s
@@ -1497,6 +1560,10 @@ export const Map = Evented.extend({
 		return DomUtil.getPosition(this._mapPane) || new Point(0, 0);
 	},
 
+	_getRotatePanePos() {
+		return this._rotatePanePos || new Point(0, 0);
+	},
+
 	_moved() {
 		const pos = this._getMapPanePos();
 		return pos && !pos.equals([0, 0]);
@@ -1511,7 +1578,22 @@ export const Map = Evented.extend({
 
 	_getNewPixelOrigin(center, zoom) {
 		const viewHalf = this.getSize()._divideBy(2);
-		return this.project(center, zoom)._subtract(viewHalf)._add(this._getMapPanePos())._round();
+
+		if (this._rotate && this._bearing) {
+			return this.project(center, zoom)
+				.rotate(this._bearing)
+				._subtract(viewHalf)
+				._add(this._getMapPanePos())
+				._add(this._getRotatePanePos())
+				.rotate(-this._bearing)
+				._round();
+		}
+
+		return this.project(center, zoom)
+			._subtract(viewHalf)
+			._add(this._getMapPanePos())
+			._round();
+
 	},
 
 	_latLngToNewLayerPoint(latlng, zoom, center) {

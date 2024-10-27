@@ -190,6 +190,30 @@ Point.prototype = {
 	// Returns a string representation of the point for debugging purposes.
 	toString() {
 		return `Point(${formatNum(this.x)}, ${formatNum(this.y)})`;
+	},
+
+	// @method rotate(theta: Number): Point
+	// Returns a Point after applying rotation in the x,y plan.
+	rotate(theta) {
+		if (!theta) { return this; }
+		// Rotate around (0,0) by applying the 2D rotation matrix:
+		// ⎡ x' ⎤ = ⎡ cos θ  -sin θ ⎤ ⎡ x ⎤
+		// ⎣ y' ⎦   ⎣ sin θ   cos θ ⎦ ⎣ y ⎦
+		// Theta must be given in radians.
+		const sinTheta = Math.sin(theta);
+		const cosTheta = Math.cos(theta);
+
+		return new Point(
+			this.x * cosTheta - this.y * sinTheta,
+			this.x * sinTheta + this.y * cosTheta
+		);
+	},
+
+	// @method rotateFrom(theta: Number, pivot: Number): String
+	// Returns a Point after applying a pivot and a rotation.
+	rotateFrom(theta, pivot) {
+		if (!theta) { return this; }
+		return this.clone().subtract(pivot).rotate(theta).add(pivot);
 	}
 };
 
