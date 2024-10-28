@@ -1110,7 +1110,7 @@ export const Map = Evented.extend({
 	// theta is in deg.
 	// setBearing will work with just the 'theta' parameter.
 	setBearing(theta) {
-		if (!Browser.any3d || !this._rotate) { return; }
+		if (!this._rotate) { return; }
 
 		let rotatePanePos = this._getRotatePanePos();
 		const halfSize = this.getSize().divideBy(2);
